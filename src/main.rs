@@ -1,44 +1,61 @@
 #![feature(proc_macro_hygiene, decl_macro)]
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
+
 pub use rocket::http::RawStr;
-pub use url_longener::store;
-pub use url_longener::longen;
+pub use url_longener::db_api::*;
+pub use url_longener::longen::*;
 
 #[get("/")]
-fn index() -> String{
+fn index() -> String {
     format!("landing")
 }
 
+#[get("/favicon.ico")]
+fn favicon() -> String {
+    format!("landing")
+}
+
+
 #[get("/<original_url>")]
-
 fn longen(original_url: &RawStr) -> String {
-    let longened_url = longen::get_longened_url(original_url);
-
-    if store::get_urls(&longened_url) == store::StoredData::empty_select_result(){
-        store::put_urls(original_url.as_str(), "hi");
+    let database_path = get_database_path();
+    let longened_url = get_longened_url(original_url);
+    let conn = match get_database_connection(database_path) {
+        Ok(conn) => conn,
+        Err(_e) => return format!("ERROR")
+    };
+    if insert_new_pair(conn, longened_url.clone(), original_url.to_string()).is_ok() {
+        format!("Inserted pair {}, {}", longened_url.as_str(), original_url)
+    } else {
+        format!("Could not insert.")
     }
-
-    format!("The longened url is {}", longened_url)
 }
 
-#[get("/<longened_url>")]
+// #[get("/<longened_url>")]
 
-fn lookup(longened_url: &RawStr) -> String {
+// fn lookup(longened_url: &RawStr) -> String {
+//     todo!()
+// }
 
-    let payload = store::get_urls(longened_url.as_str());
-    if payload == store::StoredData::empty_select_result() {
-        return format!("URL {} does not exist yet", longened_url);
-    }
-    format! ("The original URL is {}", payload.original_url)
-}
+
 
 fn main() {
-    match store::init(){
-        Ok(()) => println!("Database started..."),
-        Err(_) => println!("Error initializing database!"),
-    }
-    rocket::ignite().mount("/", routes![index])
-                    .mount("/longen", routes![longen])
-                    .mount("/lookup", routes![lookup])
-                    .launch();
+    let database_path = get_database_path();
+    println!("Initiating database at {} ...", &database_path);
+    let conn = match get_database_connection(database_path.clone()) {
+        Ok(conn) => conn,
+        Err(_e) => panic!("failed to initialize database!"),
+    };
+    println!("database connection succeeded");
+
+    match initialize_table(conn) {
+        Ok(()) => (),
+        Err(_e) => panic!("rusqlite error : failed to initialize table"),
+    };
+    println!("Table urls created");
+
+    rocket::ignite()
+        .mount("/", routes![index, favicon, longen])
+        .launch();
 }
