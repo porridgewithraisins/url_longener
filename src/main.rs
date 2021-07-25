@@ -26,7 +26,7 @@ fn longen(original_url: &RawStr) -> String {
         Err(_e) => return format!("ERROR")
     };
     if insert_new_pair(conn, longened_url.clone(), original_url.to_string()).is_ok() {
-        format!("Inserted pair {}, {}", longened_url.as_str(), original_url)
+        format!("Inserted pair {}, {}", longened_url, original_url)
     } else {
         format!("Could not insert.")
     }
