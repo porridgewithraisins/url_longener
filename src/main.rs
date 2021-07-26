@@ -3,59 +3,88 @@
 extern crate rocket;
 
 pub use rocket::http::RawStr;
-pub use url_longener::db_api::*;
-pub use url_longener::longen::*;
+use rocket::response::Redirect;
+pub use url_longener::longen_url;
+pub use url_longener::quotes_db;
+pub use url_longener::stats;
+pub use url_longener::urls_db;
 
+
+//TODO : make a html/js page and learn how to serve those in rust using rocket
 #[get("/")]
 fn index() -> String {
     format!("landing")
 }
 
+// TODO : Make a favicon with shakespeare
 #[get("/favicon.ico")]
 fn favicon() -> String {
-    format!("landing")
+    format!("Just pretend this is a favicon")
 }
 
-
-#[get("/<original_url>")]
-fn longen(original_url: &RawStr) -> String {
-    let database_path = get_database_path();
-    let longened_url = get_longened_url(original_url);
-    let conn = match get_database_connection(database_path) {
-        Ok(conn) => conn,
-        Err(_e) => return format!("ERROR")
+#[post("/longen", data = "<original_url>")]
+fn longen(original_url: String) -> String {
+    let longened_url = match longen_url::longen_url(original_url.as_str()) {
+        Ok(url) => url,
+        Err(e) => return format!("{}", e),
     };
-    if insert_new_pair(conn, longened_url.clone(), original_url.to_string()).is_ok() {
-        format!("Inserted pair {}, {}", longened_url, original_url)
+    //TODO : make original_url standard
+    if urls_db::insert_new_pair(longened_url.as_str(), original_url.as_str()).is_ok() {
+        format!("Accepted {} as {}", longened_url.as_str(), original_url.as_str())
     } else {
-        format!("Could not insert.")
+        println!("LOG : Could not insert");
+        format!("Please try again later")
     }
 }
 
-// #[get("/<longened_url>")]
+#[get("/<longened_url>")]
+fn lookup(longened_url: &RawStr) -> Redirect {
+    match urls_db::select_original_url(longened_url.as_str()) {
+        Ok(url) => {
+            match urls_db::update_clicks(longened_url.as_str()){
+                Ok(_) => println!("LOG : Clicks updated"),
+                Err(e) => println!("LOG : Failed to update click... : {}", e)
+            };
 
-// fn lookup(longened_url: &RawStr) -> String {
-//     todo!()
-// }
+            Redirect::permanent(format!("http://{}", url))
+        },
+
+        Err(e) => {println!("{}", e); Redirect::permanent("/")},
+    }
+}
+
+#[get("/<longened_url>/clicks")]
+fn clicks(longened_url: &RawStr) -> String {
+    match stats::get_clicks_of(longened_url.as_str()) {
+        Ok(click_count) => format!("{} has been clicked {} times", longened_url.as_str(), click_count),
+        Err(_e) => format!("Could not retrieve the requested data"),
+    }
+}
 
 
+#[get("/<longened_url>/full")]
+fn full_stats(longened_url: &RawStr) -> String {
+    match stats::get_full_stats_of(longened_url.as_str()) {
+        Ok(data) => format!(
+            "Original URL \t Longened URL \t Clicks\n{}\t{}\t{}\t",
+            data.original, data.longened, data.clicks
+        ),
+        Err(e) => format!("Could not retrieve the requested data {}", e),
+    }
+}
 
 fn main() {
-    let database_path = get_database_path();
-    println!("Initiating database at {} ...", &database_path);
-    let conn = match get_database_connection(database_path.clone()) {
-        Ok(conn) => conn,
-        Err(_e) => panic!("failed to initialize database!"),
+    match urls_db::init_database() {
+        Ok(_) => println!("LOG : urls database started"),
+        Err(_) => panic!("urls database failed to start"),
     };
-    println!("database connection succeeded");
-
-    match initialize_table(conn) {
-        Ok(()) => (),
-        Err(_e) => panic!("rusqlite error : failed to initialize table"),
+    match quotes_db::init_database() {
+        Ok(_) => println!("LOG : quotes database started"),
+        Err(e) => panic!("quotes database failed to start {}", e),
     };
-    println!("Table urls created");
 
     rocket::ignite()
-        .mount("/", routes![index, favicon, longen])
+        .mount("/", routes![index, favicon, lookup, longen])
+        .mount("/stats", routes![clicks, full_stats])
         .launch();
 }

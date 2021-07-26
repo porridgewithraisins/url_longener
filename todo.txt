@@ -1,3 +1,0 @@
-1. Refactor error handling in store.rs to use the QueryReturnedNoRows
-2. Make everything use query_row, as we only query unique columns
-3. Finish up a little bit of logic

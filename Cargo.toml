@@ -9,3 +9,4 @@ edition = "2018"
 rocket = "0.4.10"
 rocket_codegen = { git = "https://github.com/SergioBenitez/Rocket" }
 rusqlite = "0.25.3"
+url = "2.2.2"
