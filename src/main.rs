@@ -26,14 +26,14 @@ fn favicon() -> String {
 fn longen(original_url: String) -> String {
     let longened_url = match longen_url::longen_url(original_url.as_str()) {
         Ok(url) => url,
-        Err(e) => return format!("{}", e),
+        Err(_) => return format!("Please try again later"),
     };
     //TODO : make original_url standard
     if urls_db::insert_new_pair(longened_url.as_str(), original_url.as_str()).is_ok() {
         format!("Accepted {} as {}", longened_url.as_str(), original_url.as_str())
     } else {
-        println!("LOG : Could not insert");
-        format!("Please try again later")
+        println!("LOG : Could not insert, it already exists");
+        format!("This url already exists, we are supposed to give you that URL, but we haven't implemented that yet.")
     }
 }
 
@@ -41,15 +41,15 @@ fn longen(original_url: String) -> String {
 fn lookup(longened_url: &RawStr) -> Redirect {
     match urls_db::select_original_url(longened_url.as_str()) {
         Ok(url) => {
-            match urls_db::update_clicks(longened_url.as_str()){
+            match urls_db::update_clicks(url.clone()){
                 Ok(_) => println!("LOG : Clicks updated"),
                 Err(e) => println!("LOG : Failed to update click... : {}", e)
             };
-
-            Redirect::permanent(format!("http://{}", url))
+            println!("Redirecting to {}", &url);
+            Redirect::temporary(format!("http://{}", &url))
         },
 
-        Err(e) => {println!("{}", e); Redirect::permanent("/")},
+        Err(e) => {println!("{}", e); Redirect::temporary("/")},
     }
 }
 

@@ -3,7 +3,6 @@ pub use rusqlite;
 
 pub fn get_clicks_of<S:Into<String>>(longened_url : S) -> rusqlite::Result<i32>{
     let s = longened_url.into();
-    println!("What is going on {}", s.clone());
     urls_db::select_clicks(s)
 }
 
