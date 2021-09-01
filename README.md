@@ -5,4 +5,3 @@ It hosts URLs with Shakespeare quotes as the path.
 Every single line of Shakespeare is used (included in `data/`)
 so there's a lot of URLs to burn through.
 
-[Still in progress]
